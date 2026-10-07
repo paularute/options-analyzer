@@ -176,7 +176,7 @@ footer{color:var(--dim);font-size:12px;text-align:center;padding:10px 20px 24px}
       <div class="table-wrap">
         <table class="legs">
           <thead><tr>
-            <th style="width:62px">Type</th><th style="width:68px">Side</th><th style="width:48px">Qty</th><th style="width:60px">Strike</th>
+            <th style="width:62px">Type</th><th style="width:78px">Buy/Sell</th><th style="width:48px">Qty</th><th style="width:60px">Strike</th>
             <th style="width:118px">Expiry</th><th style="width:60px">Entry $</th><th style="width:54px">IV %</th><th style="width:60px">Theo</th><th style="width:88px"></th>
           </tr></thead>
           <tbody id="legsBody"></tbody>
@@ -187,7 +187,7 @@ footer{color:var(--dim);font-size:12px;text-align:center;padding:10px 20px 24px}
         <button class="btn sm" data-add="put">+ Put</button>
         <button class="btn sm" data-add="stock">+ Stock</button>
       </div>
-      <div class="hint">Qty = contracts (×100) for options, shares for stock. Entry $ = premium per share you paid (long) or received (short); for stock, your cost per share. <b>IV⟲</b> solves implied vol from Entry $ at today's stock price. Theo = model value per share today.</div>
+      <div class="hint">Qty = contracts (×100) for options, shares for stock. Entry $ = premium per share you paid (buy) or received (sell); for stock, your cost per share. <b>IV⟲</b> solves implied vol from Entry $ at today's stock price. Theo = model value per share today.</div>
     </div>
 
     <div class="card" id="cmpCard">
@@ -435,7 +435,7 @@ function amznState(){
     show:{eval:true, expiry:true, today:false}, active:2,
     scenarios:[
       {name:'LEAPS alone (Jun \'27 $280)', color:COLORS[0], visible:true, legs:[long()]},
-      {name:'LEAPS + short Dec $305', color:COLORS[1], visible:true, legs:[long(), {type:'call', side:'short', qty:5, strike:305, expiry:'2026-12-18', premium:3.80, iv:ivDec}]},
+      {name:'LEAPS + sell Dec $305', color:COLORS[1], visible:true, legs:[long(), {type:'call', side:'short', qty:5, strike:305, expiry:'2026-12-18', premium:3.80, iv:ivDec}]},
       {name:'Bull call spread 280/305 (Jun)', color:COLORS[2], visible:true, legs:[long(), {type:'call', side:'short', qty:5, strike:305, expiry:'2027-06-17', premium:18.10, iv:ivJun305}]},
     ]
   };
@@ -561,7 +561,7 @@ function legRow(l, i){
   const tr = document.createElement('tr'); tr.className = l.side; tr.dataset.i = i;
   tr.innerHTML = `
     <td><select data-k="type"><option value="call"${l.type==='call'?' selected':''}>Call</option><option value="put"${l.type==='put'?' selected':''}>Put</option><option value="stock"${isStock?' selected':''}>Stock</option></select></td>
-    <td><select class="side" data-k="side"><option value="long"${l.side==='long'?' selected':''}>Long</option><option value="short"${l.side==='short'?' selected':''}>Short</option></select></td>
+    <td><select class="side" data-k="side"><option value="long"${l.side==='long'?' selected':''}>Buy</option><option value="short"${l.side==='short'?' selected':''}>Sell</option></select></td>
     <td><input type="number" data-k="qty" min="0" step="1" value="${l.qty}" title="${isStock ? 'Shares' : 'Contracts (×100)'}"></td>
     <td><input type="number" data-k="strike" min="0" step="0.5" value="${isStock ? '' : l.strike}" ${isStock ? 'disabled placeholder="—"' : ''}></td>
     <td><input type="date" data-k="expiry" value="${isStock ? '' : l.expiry}" ${isStock ? 'disabled' : ''}></td>
