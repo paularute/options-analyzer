@@ -620,7 +620,7 @@ function seriesColor(s, single){
 function layoutPills(ctx, pills, left, right){
   ctx.save();
   ctx.font = '600 10.5px system-ui, sans-serif';
-  const gap = 6;
+  const gap = 12;
   const items = pills.map(p => {
     const w = Math.ceil(ctx.measureText(p.label).width) + 12;
     let x = Math.round(p.anchor - w / 2);
