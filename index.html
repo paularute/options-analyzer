@@ -84,7 +84,7 @@ input[type=range]{accent-color:var(--accent);height:4px;cursor:pointer}
 .tooltip .row{display:flex;gap:8px;align-items:center;justify-content:space-between;white-space:nowrap}
 .tooltip .row span.l{display:flex;gap:6px;align-items:center;color:var(--muted)}
 .tooltip .v{font-variant-numeric:tabular-nums;font-weight:600}
-.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;font-size:12px;color:var(--muted);align-items:center}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:12px;color:var(--muted);align-items:center;max-width:100%}
 .legend .it{display:flex;gap:6px;align-items:center}
 .sw{display:inline-block;width:10px;height:10px;border-radius:3px}
 .pos{color:var(--pos)} .neg{color:var(--neg)}
@@ -318,10 +318,12 @@ function money(v, signed){
 function moneySmall(v){ if (!isFinite(v)) return '—'; if (Math.abs(v) >= 100) return money(v, true); return (v < -0.005 ? '−' : v > 0.005 ? '+' : '') + '$' + nf2.format(Math.abs(v)); }
 function moneyCls(v){ return v > 0.5 ? 'pos' : v < -0.5 ? 'neg' : ''; }
 function axisMoney(v){
-  const a = Math.abs(v), s = v < 0 ? '−' : '';
-  if (a >= 1e6) return s + '$' + (a/1e6).toFixed(a >= 1e7 ? 0 : 1) + 'M';
+  const a = Math.abs(v);
+  if (a < 0.5) return '$0';
+  const s = v < 0 ? '-' : '';
+  if (a >= 1e6) return s + '$' + (a/1e6).toFixed(a >= 1e7 ? 0 : 1).replace(/\.0$/,'') + 'M';
   if (a >= 1e3) return s + '$' + (a/1e3).toFixed(a >= 1e4 ? 0 : 1).replace(/\.0$/,'') + 'k';
-  return s + '$' + a.toFixed(0);
+  return s + '$' + Math.round(a);
 }
 function px(v){ return '$' + nf2.format(v); }
 function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -608,6 +610,41 @@ function update(){
 /* ================= Chart ================= */
 const chart = {series: [], geo: null};
 const ZONE_PROFIT = '34,197,94', ZONE_LOSS = '239,68,68';
+const SINGLE_PAYOFF = '#f4f7ff', SINGLE_EVAL = '#38bdf8', SINGLE_TODAY = '#94a3b8';
+function seriesColor(s, single){
+  if (!single) return s.sc.color;
+  if (s.kind === 'expiry') return SINGLE_PAYOFF;
+  if (s.kind === 'eval') return SINGLE_EVAL;
+  return SINGLE_TODAY;
+}
+function layoutPills(ctx, pills, left, right){
+  ctx.save();
+  ctx.font = '600 10.5px system-ui, sans-serif';
+  const gap = 6;
+  const items = pills.map(p => {
+    const w = Math.ceil(ctx.measureText(p.label).width) + 12;
+    let x = Math.round(p.anchor - w / 2);
+    if (x < left) x = left;
+    if (x + w > right) x = Math.max(left, right - w);
+    return {label: p.label, color: p.color, anchor: p.anchor, w, x, pref: x, row: 0};
+  }).sort((a, b) => a.anchor - b.anchor);
+  const rows = [];
+  const hits = (row, x, w) => row.some(o => x < o.x + o.w + gap && x + w + gap > o.x);
+  for (const it of items){
+    let placed = false;
+    for (let r = 0; r < rows.length; r++){
+      it.x = it.pref;
+      if (hits(rows[r], it.x, it.w)){
+        const edge = Math.max(...rows[r].filter(o => it.x < o.x + o.w + gap && it.x + it.w + gap > o.x).map(o => o.x + o.w + gap));
+        if (edge + it.w <= right) it.x = edge;
+      }
+      if (!hits(rows[r], it.x, it.w)){ it.row = r; rows[r].push(it); placed = true; break; }
+    }
+    if (!placed){ it.row = rows.length; rows.push([it]); }
+  }
+  ctx.restore();
+  return {items, rows: rows.length};
+}
 function buildSeries(){
   const m = mkt(); const out = [];
   const order = state.scenarios.map((sc, i) => i).filter(i => state.scenarios[i].visible || i === state.active);
@@ -637,10 +674,24 @@ function drawChart(){
     for (let k = 0; k <= N; k++){ const x = xMin + (xMax - xMin) * k / N; const y = positionPL(s.sc.legs, x, s.date, m); s.pts.push([x, y]); if (y < yMin) yMin = y; if (y > yMax) yMax = y; }
   }
   if (yMax - yMin < 1){ yMax += 100; yMin -= 100; }
-  const padY = (yMax - yMin) * 0.08; yMax += padY; yMin -= padY;
-  const L = 64, R = 16, T = 18, B = 34;
-  const pw = W - L - R, ph = H - T - B;
-  const X = x => L + (x - xMin) / (xMax - xMin) * pw, Y = y => T + (yMax - y) / (yMax - yMin) * ph;
+  const single = state.scenarios.length === 1;
+  const span = yMax - yMin;
+  yMax += span * (single ? 0.18 : 0.08);
+  yMin -= span * 0.08;
+  const L = 64, R = 16, B = 34;
+  const pw = W - L - R;
+  const X = x => L + (x - xMin) / (xMax - xMin) * pw;
+  const sc0 = activeSc();
+  const an = sc0.legs.length ? expiryAnalysis(sc0.legs) : null;
+  const rawPills = [];
+  const pushPill = (price, color, label) => { if (price < xMin || price > xMax) return; rawPills.push({anchor: X(price), color, label}); };
+  if (an && state.show.expiry) an.breakevens.forEach(b => pushPill(b, '#c4b5fd', 'BE ' + px(b)));
+  if (isFinite(state.target) && state.target > 0) pushPill(state.target, '#f472b6', 'Target ' + px(state.target));
+  pushPill(m.S, '#e7ecf6', (state.ticker || 'Spot') + ' ' + px(m.S));
+  const laid = layoutPills(ctx, rawPills, L, L + pw);
+  const T = laid.rows ? 3 + laid.rows * 18 : 12;
+  const ph = H - T - B;
+  const Y = y => T + (yMax - y) / (yMax - yMin) * ph;
   chart.series = series; chart.geo = {L, R, T, B, pw, ph, xMin, xMax, yMin, yMax, X, Y, W, H};
   ctx.font = '11px system-ui, sans-serif'; ctx.textBaseline = 'middle';
   // grid
@@ -669,25 +720,79 @@ function drawChart(){
   }
   // zero line, drawn over the zones so $0 stays visible
   if (yMin < 0 && yMax > 0){ ctx.strokeStyle = 'rgba(232,238,248,0.92)'; ctx.lineWidth = 1.25; ctx.setLineDash([]); const y = Math.round(Y(0)) + 0.5; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(L + pw, y); ctx.stroke(); }
-  // vertical markers
-  const vline = (x, color, dash, label, row) => {
-    if (x < xMin || x > xMax) return;
-    const px_ = Math.round(X(x)) + 0.5; ctx.save(); ctx.strokeStyle = color; ctx.setLineDash(dash); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px_, T); ctx.lineTo(px_, T + ph); ctx.stroke(); ctx.restore();
-    if (label){ ctx.save(); ctx.font = '600 10.5px system-ui, sans-serif'; const tw = ctx.measureText(label).width + 10; let lx = px_ - tw/2; lx = Math.max(L, Math.min(L + pw - tw, lx)); const ly = T + 2 + row*17;
-      ctx.fillStyle = 'rgba(10,15,29,0.9)'; ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.setLineDash([]); roundRect(ctx, lx, ly, tw, 15, 4); ctx.fill(); ctx.stroke(); ctx.fillStyle = color; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(label, lx + 5, ly + 7.5); ctx.restore(); }
-  };
-  const sc = activeSc(); const an = sc.legs.length ? expiryAnalysis(sc.legs) : null;
-  if (an && state.show.expiry) an.breakevens.forEach((b, k) => vline(b, '#c4b5fd', [3, 3], 'BE ' + px(b), 1 + (k % 2)));
-  if (isFinite(state.target) && state.target > 0) vline(state.target, '#f472b6', [2, 4], 'Target ' + px(state.target), 3);
-  vline(m.S, '#e7ecf6', [5, 4], (state.ticker || 'Spot') + ' ' + px(m.S), 0);
+  // vertical markers stop at the plot; their pills sit in the strip above it
+  const guides = [
+    ...(an && state.show.expiry ? an.breakevens.map(b => [b, '#c4b5fd', [3, 3]]) : []),
+    ...(isFinite(state.target) && state.target > 0 ? [[state.target, '#f472b6', [2, 4]]] : []),
+    [m.S, '#e7ecf6', [5, 4]]
+  ];
+  for (const [price, color, dash] of guides){
+    if (price < xMin || price > xMax) continue;
+    const px_ = Math.round(X(price)) + 0.5;
+    ctx.save(); ctx.strokeStyle = color; ctx.setLineDash(dash); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px_, T); ctx.lineTo(px_, T + ph); ctx.stroke(); ctx.restore();
+  }
+  ctx.save(); ctx.font = '600 10.5px system-ui, sans-serif'; ctx.textBaseline = 'middle'; ctx.setLineDash([]);
+  for (const it of laid.items){
+    const ly = 2 + it.row * 18;
+    ctx.fillStyle = 'rgba(10,15,29,0.94)'; ctx.strokeStyle = it.color; ctx.lineWidth = 1;
+    roundRect(ctx, it.x, ly, it.w, 15, 4); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = it.color; ctx.textAlign = 'left'; ctx.fillText(it.label, it.x + 6, ly + 7.5);
+  }
+  ctx.restore();
   // curves
   ctx.save(); ctx.beginPath(); ctx.rect(L, T, pw, ph); ctx.clip();
   for (const s of series){
-    ctx.strokeStyle = s.sc.color; ctx.globalAlpha = s.active ? 1 : 0.75; ctx.lineWidth = (s.active ? 2.6 : 1.7) * (s.kind === 'expiry' ? 1 : 0.9);
+    s.stroke = seriesColor(s, single);
+    ctx.strokeStyle = s.stroke; ctx.globalAlpha = s.active ? 1 : 0.75; ctx.lineWidth = (s.active ? 2.6 : 1.7) * (s.kind === 'expiry' ? 1 : 0.9);
     ctx.setLineDash(s.dash); ctx.lineJoin = 'round'; ctx.beginPath();
     s.pts.forEach(([x, y], k) => k ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))); ctx.stroke();
   }
   ctx.restore(); ctx.globalAlpha = 1; ctx.setLineDash([]);
+  if (single){
+    const notes = [];
+    const halo = (text, x, y, fill, align) => {
+      ctx.save(); ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = align; ctx.textBaseline = 'middle';
+      const w = ctx.measureText(text).width;
+      let yy = y;
+      const box = () => { const l = align === 'right' ? x - w : x; return {l, r: l + w, t: yy - 8, b: yy + 8}; };
+      let b = box();
+      for (let n = 0; n < 5 && notes.some(o => b.l < o.r + 4 && b.r > o.l - 4 && b.t < o.b && b.b > o.t); n++){ yy += 16; b = box(); }
+      yy = Math.max(T + 12, Math.min(T + ph - 10, yy));
+      notes.push(box());
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,15,29,0.88)'; ctx.strokeText(text, x, yy);
+      ctx.fillStyle = fill; ctx.fillText(text, x, yy); ctx.restore();
+    };
+    const exp = series.find(s => s.kind === 'expiry' && s.active);
+    if (exp && an){
+      const pts = exp.pts;
+      const runFrom = (start, dir) => {
+        const y0 = pts[start][1], tol = Math.max(25, Math.abs(y0) * 0.02);
+        let i = start, n = 0;
+        while (i >= 0 && i < pts.length && Math.abs(pts[i][1] - y0) <= tol){ n++; i += dir; }
+        return n;
+      };
+      const labelFor = (level) => {
+        if (isFinite(an.maxProfit) && Math.abs(level - an.maxProfit) <= Math.max(50, Math.abs(an.maxProfit) * 0.04)) return money(an.maxProfit, true);
+        if (isFinite(an.maxLoss) && Math.abs(level - an.maxLoss) <= Math.max(50, Math.abs(an.maxLoss) * 0.04)) return money(an.maxLoss, true);
+        return money(level, true);
+      };
+      const rightN = runFrom(pts.length - 1, -1), leftN = runFrom(0, 1);
+      if (rightN >= 6){
+        const level = pts[pts.length - 1][1], yLine = Y(level);
+        halo(labelFor(level), L + pw - 8, Math.max(T + 12, Math.min(T + ph - 10, yLine + (level >= 0 ? -11 : 12))), SINGLE_PAYOFF, 'right');
+      }
+      if (leftN >= 6 && leftN + rightN < pts.length + 4){
+        const end = leftN - 1, level = pts[0][1], yLine = Y(level);
+        halo(labelFor(level), Math.min(L + pw - 8, X(pts[end][0]) - 6), Math.max(T + 12, Math.min(T + ph - 10, yLine + (level >= 0 ? -11 : 12))), SINGLE_PAYOFF, 'right');
+      }
+    }
+    const ev = series.find(s => s.kind === 'eval' && s.active);
+    if (ev){
+      const last = ev.pts[ev.pts.length - 1];
+      const yLine = Y(last[1]);
+      halo(prettyDate(state.evalDate), L + pw - 8, Math.max(T + 12, Math.min(T + ph - 10, yLine - 12)), SINGLE_EVAL, 'right');
+    }
+  }
   // frame
   ctx.strokeStyle = 'rgba(140,155,190,0.25)'; ctx.strokeRect(L + 0.5, T + 0.5, pw, ph);
   if (!series.length){ ctx.fillStyle = '#7d89a8'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '13px system-ui'; ctx.fillText('Add legs to see the payoff', L + pw/2, T + ph/2); }
@@ -697,9 +802,19 @@ function drawChart(){
 function roundRect(ctx, x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 function dashSvg(color, dash, w){ return `<svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="${color}" stroke-width="${w}" ${dash.length ? `stroke-dasharray="${dash.join(' ')}"` : ''}/></svg>`; }
 function renderLegend(series){
-  const seen = new Map(); for (const s of series) if (!seen.has(s.i)) seen.set(s.i, s.sc);
-  let h = ''; for (const [i, sc] of seen) h += `<span class="it" style="${i === state.active ? 'color:var(--text);font-weight:600' : ''}"><span class="sw" style="background:${sc.color}"></span>${esc(sc.name)}${i === state.active ? ' (editing)' : ''}</span>`;
-  h += `<span class="it"><span class="sw" style="background:rgba(${ZONE_PROFIT},0.85)"></span>profit / <span class="sw" style="background:rgba(${ZONE_LOSS},0.85)"></span>loss zone (editing, final expiry)</span>`;
+  const single = state.scenarios.length === 1;
+  let h = '';
+  if (single){
+    if (series.some(s => s.kind === 'expiry')) h += `<span class="it">${dashSvg(SINGLE_PAYOFF, [], 2.6)} Final expiry</span>`;
+    if (series.some(s => s.kind === 'eval')) h += `<span class="it">${dashSvg(SINGLE_EVAL, [7, 4], 2.2)} ${esc(prettyDate(state.evalDate))}</span>`;
+    if (series.some(s => s.kind === 'today')) h += `<span class="it">${dashSvg(SINGLE_TODAY, [1.5, 4], 2)} Today</span>`;
+    h += `<span class="it"><span class="sw" style="background:rgba(${ZONE_PROFIT},0.85)"></span>Profit</span>`;
+    h += `<span class="it"><span class="sw" style="background:rgba(${ZONE_LOSS},0.85)"></span>Loss</span>`;
+  } else {
+    const seen = new Map(); for (const s of series) if (!seen.has(s.i)) seen.set(s.i, s.sc);
+    for (const [i, sc] of seen) h += `<span class="it" style="${i === state.active ? 'color:var(--text);font-weight:600' : ''}"><span class="sw" style="background:${sc.color}"></span>${esc(sc.name)}${i === state.active ? ' (editing)' : ''}</span>`;
+    h += `<span class="it"><span class="sw" style="background:rgba(${ZONE_PROFIT},0.85)"></span>profit / <span class="sw" style="background:rgba(${ZONE_LOSS},0.85)"></span>loss zone (editing, final expiry)</span>`;
+  }
   $('#legend').innerHTML = h;
 }
 function hideHover(){ const ov = $('#overlay'); ov.getContext('2d').clearRect(0, 0, ov.width, ov.height); $('#tooltip').style.display = 'none'; }
@@ -715,8 +830,9 @@ function onHover(ev){
   const list = [...chart.series].reverse();
   for (const s of list){
     const v = positionPL(s.sc.legs, S, s.date, m); const y = g.Y(v);
-    if (y >= g.T && y <= g.T + g.ph){ ctx.fillStyle = s.sc.color; ctx.beginPath(); ctx.arc(mx, y, s.active ? 4 : 3, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#0a0f1d'; ctx.lineWidth = 1.5; ctx.stroke(); }
-    rows += `<div class="row"><span class="l">${dashSvg(s.sc.color, s.dash, 2.2)}<span style="max-width:170px;overflow:hidden;text-overflow:ellipsis">${esc(s.sc.name)}</span> · ${esc(s.label)}</span><span class="v ${moneyCls(v)}">${money(v, true)}</span></div>`;
+    const col = s.stroke || s.sc.color;
+    if (y >= g.T && y <= g.T + g.ph){ ctx.fillStyle = col; ctx.beginPath(); ctx.arc(mx, y, s.active ? 4 : 3, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#0a0f1d'; ctx.lineWidth = 1.5; ctx.stroke(); }
+    rows += `<div class="row"><span class="l">${dashSvg(col, s.dash, 2.2)}<span style="max-width:170px;overflow:hidden;text-overflow:ellipsis">${esc(s.sc.name)}</span> · ${esc(s.label)}</span><span class="v ${moneyCls(v)}">${money(v, true)}</span></div>`;
   }
   const pct = (S / m.S - 1) * 100;
   const tt = $('#tooltip'); tt.innerHTML = `<div class="th">${esc(state.ticker || 'Price')} ${px(S)} <span style="color:var(--muted);font-weight:400">(${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%)</span></div>${rows}`;
