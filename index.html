@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Options Strategy Visualizer</title>
+<style>
+:root{
+  --bg:#0a0f1d; --panel:#111829; --panel2:#172036; --border:#24304b; --border2:#2f3d5e;
+  --text:#e7ecf6; --muted:#8b97b4; --dim:#5d6886; --accent:#5b9cff; --pos:#34d399; --neg:#f87171; --warn:#fbbf24;
+  --radius:12px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+button,input,select{font:inherit;color:inherit}
+header{display:flex;align-items:center;gap:14px;padding:12px 20px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#121a2f 0%,#0a0f1d 100%);flex-wrap:wrap;position:relative;z-index:5}
+.brand{display:flex;align-items:center;gap:10px;font-weight:650;font-size:16px;letter-spacing:.2px}
+.brand .logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#5b9cff,#34d399);display:grid;place-items:center;color:#0a0f1d;font-weight:800;font-size:15px}
+.brand small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.spacer{flex:1}
+.btn{background:var(--panel2);border:1px solid var(--border2);border-radius:8px;padding:6px 12px;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s}
+.btn:hover{background:#1e2945;border-color:#3b4b73}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#06101f;font-weight:600}
+.btn.primary:hover{background:#78afff}
+.btn.sm{padding:3px 8px;font-size:12px;border-radius:6px}
+.btn.icon{padding:3px 5px;font-size:12px;line-height:1.2}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+main.layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;padding:16px 20px;align-items:start;max-width:1800px;margin:0 auto}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.sticky{position:sticky;top:12px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.card h2{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:8px}
+.card h2 .grow{flex:1}
+.grid-inputs{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+input[type=text],input[type=number],input[type=date],select{background:#0d1424;border:1px solid var(--border2);border-radius:7px;padding:6px 8px;min-width:0;width:100%;outline:none;transition:border-color .15s}
+input:focus,select:focus{border-color:var(--accent)}
+input:disabled{opacity:.35}
+input[type=date]{color-scheme:dark}
+input[type=number]{-moz-appearance:textfield}
+input[type=number]::-webkit-inner-spin-button{opacity:.4}
+/* scenarios */
+.scen-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.scen-tab{display:flex;align-items:center;gap:7px;padding:6px 8px 6px 10px;border:1px solid var(--border2);border-radius:9px;background:#0d1424;cursor:pointer;user-select:none;max-width:100%}
+.scen-tab.active{border-color:var(--sc);box-shadow:0 0 0 1px var(--sc) inset;background:#131c33}
+.scen-tab .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}
+.scen-tab input[type=color]{width:18px;height:18px;padding:0;border:none;background:none;cursor:pointer;border-radius:4px}
+.scen-tab input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+.scen-tab input[type=color]::-webkit-color-swatch{border:none;border-radius:4px}
+.eye{opacity:.9;cursor:pointer;font-size:13px;border:none;background:none;padding:0 2px}
+.eye.off{opacity:.3}
+.x{border:none;background:none;color:var(--dim);cursor:pointer;font-size:15px;padding:0 2px;line-height:1}
+.x:hover{color:var(--neg)}
+.legs-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.legs-head .name{flex:1;min-width:160px}
+.table-wrap{overflow-x:auto;margin:0 -4px}
+table.legs{width:100%;border-collapse:separate;border-spacing:3px 4px;min-width:640px;table-layout:fixed}
+table.legs input[type=number]::-webkit-inner-spin-button,table.legs input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+table.legs th{font-size:11px;color:var(--muted);text-align:left;font-weight:600;text-transform:uppercase;letter-spacing:.6px;padding:0 2px}
+table.legs td{padding:0}
+table.legs input,table.legs select{padding:5px 5px;font-size:13px}
+table.legs select{padding-right:0}
+table.legs input[type=date]{font-size:12.5px;padding:5px 3px}
+table.legs td.theo{font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted);white-space:nowrap;padding:0 4px}
+table.legs tr.short select.side{color:var(--neg)}
+table.legs tr.long select.side{color:var(--pos)}
+.acts{display:flex;gap:3px;white-space:nowrap}
+.empty{color:var(--dim);text-align:center;padding:14px;font-size:13px}
+.hint{color:var(--dim);font-size:12px;margin-top:8px}
+/* chart */
+.chart-ctrl{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}
+.chart-ctrl .evalbox{flex:1;min-width:260px}
+.evalrow{display:flex;gap:8px;align-items:center}
+.evalrow input[type=range]{flex:1}
+.evalrow input[type=date]{width:150px}
+input[type=range]{accent-color:var(--accent);height:4px;cursor:pointer}
+.toggles{display:flex;gap:12px;align-items:center;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.toggles label{display:flex;gap:5px;align-items:center;cursor:pointer}
+.toggles input{accent-color:var(--accent)}
+.chart-wrap{position:relative;height:440px;width:100%}
+.chart-wrap canvas{position:absolute;inset:0;width:100%;height:100%}
+#overlay{cursor:crosshair}
+.tooltip{position:absolute;pointer-events:none;background:rgba(10,15,29,.96);border:1px solid var(--border2);border-radius:9px;padding:8px 10px;font-size:12px;min-width:200px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.45);z-index:3}
+.tooltip .th{font-weight:650;margin-bottom:4px;font-size:13px}
+.tooltip .row{display:flex;gap:8px;align-items:center;justify-content:space-between;white-space:nowrap}
+.tooltip .row span.l{display:flex;gap:6px;align-items:center;color:var(--muted)}
+.tooltip .v{font-variant-numeric:tabular-nums;font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;font-size:12px;color:var(--muted);align-items:center}
+.legend .it{display:flex;gap:6px;align-items:center}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px}
+.pos{color:var(--pos)} .neg{color:var(--neg)}
+/* summary */
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.stat{background:#0d1424;border:1px solid var(--border);border-radius:10px;padding:9px 11px}
+.stat .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.stat .val{font-size:18px;font-weight:650;font-variant-numeric:tabular-nums;margin-top:2px;word-break:break-word}
+.stat .sub{font-size:11px;color:var(--dim);margin-top:1px}
+.sumhead{display:flex;align-items:center;gap:8px;margin:14px 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600}
+.sumhead:first-child{margin-top:0}
+.sumhead .line{flex:1;height:1px;background:var(--border)}
+.target-in{display:flex;gap:6px;align-items:center;text-transform:none;letter-spacing:0;font-weight:400}
+.target-in input{width:100px}
+table.cmp{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+table.cmp th,table.cmp td{padding:6px 5px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}
+table.cmp th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+table.cmp td:first-child,table.cmp th:first-child{text-align:left;white-space:normal;min-width:120px}
+footer{color:var(--dim);font-size:12px;text-align:center;padding:10px 20px 24px}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#1d2a48;border:1px solid var(--border2);padding:9px 16px;border-radius:9px;opacity:0;transition:all .25s;pointer-events:none;z-index:50;font-size:13px}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:40}
+.modal-bg.show{display:flex}
+.modal{background:var(--panel);border:1px solid var(--border2);border-radius:14px;padding:18px;width:min(560px,92vw)}
+.modal h3{margin:0 0 6px;font-size:15px}
+.modal p{color:var(--muted);font-size:13px;margin:0 0 10px}
+.modal textarea{width:100%;height:110px;background:#0d1424;border:1px solid var(--border2);border-radius:8px;color:var(--text);padding:8px;font:12px ui-monospace,Menlo,Consolas,monospace;resize:vertical}
+.modal .row{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+@media (max-width:1200px){
+  main.layout{grid-template-columns:1fr}
+  .sticky{position:static}
+  .col-right{order:-1}
+}
+@media (max-width:640px){
+  main.layout{padding:10px}
+  .chart-wrap{height:330px}
+  header{padding:10px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">Δ</div><div>Options Strategy Visualizer<small>Black-Scholes payoff &amp; scenario explorer</small></div></div>
+  <div class="spacer"></div>
+  <button class="btn primary" id="btnShare" title="Copies a link that contains the full setup">🔗 Copy share link</button>
+  <button class="btn" id="btnImport" title="Paste a share link or code">Import</button>
+  <button class="btn" id="btnReset" title="Reset to the AMZN example">Reset</button>
+</header>
+
+<main class="layout">
+  <section class="col col-left">
+    <div class="card">
+      <h2>Market</h2>
+      <div class="grid-inputs">
+        <label class="f">Ticker<input type="text" id="ticker" maxlength="12" autocomplete="off"></label>
+        <label class="f">Stock price ($)<input type="number" id="spot" step="0.01" min="0"></label>
+        <label class="f">Risk-free rate (%)<input type="number" id="rate" step="0.1"></label>
+        <label class="f">Dividend yield (%)<input type="number" id="div" step="0.1" min="0"></label>
+        <label class="f">Today<input type="date" id="today"></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Scenarios <span class="grow"></span><span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--dim)">up to 3 · click to edit · 👁 to overlay</span></h2>
+      <div class="scen-tabs" id="scenTabs"></div>
+    </div>
+
+    <div class="card">
+      <h2>Legs <span class="grow"></span></h2>
+      <div class="legs-head">
+        <input type="text" class="name" id="scenName" placeholder="Scenario name" maxlength="60">
+        <select id="preset" style="width:auto">
+          <option value="">Load preset…</option>
+          <optgroup label="Strategies (uses current price)">
+            <option value="longcall">Long call</option>
+            <option value="covered">Covered call / buy-write</option>
+            <option value="pmcc">Poor man's covered call</option>
+            <option value="bullcall">Bull call spread</option>
+            <option value="csp">Cash-secured put</option>
+            <option value="collar">Collar</option>
+            <option value="rr">Risk reversal</option>
+          </optgroup>
+          <optgroup label="Examples (replaces everything)">
+            <option value="amzn">AMZN example (Paul's LEAPS, 3 scenarios)</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table class="legs">
+          <thead><tr>
+            <th style="width:62px">Type</th><th style="width:68px">Side</th><th style="width:48px">Qty</th><th style="width:60px">Strike</th>
+            <th style="width:118px">Expiry</th><th style="width:60px">Entry $</th><th style="width:54px">IV %</th><th style="width:60px">Theo</th><th style="width:88px"></th>
+          </tr></thead>
+          <tbody id="legsBody"></tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn sm" data-add="call">+ Call</button>
+        <button class="btn sm" data-add="put">+ Put</button>
+        <button class="btn sm" data-add="stock">+ Stock</button>
+      </div>
+      <div class="hint">Qty = contracts (×100) for options, shares for stock. Entry $ = premium per share you paid (long) or received (short); for stock, your cost per share. <b>IV⟲</b> solves implied vol from Entry $ at today's stock price. Theo = model value per share today.</div>
+    </div>
+
+    <div class="card" id="cmpCard">
+      <h2>Scenario comparison</h2>
+      <div style="overflow-x:auto"><table class="cmp" id="cmpTable"></table></div>
+    </div>
+  </section>
+
+  <section class="col col-right">
+    <div class="card sticky" id="chartCard">
+      <div class="chart-ctrl">
+        <div class="evalbox">
+          <label class="f">Evaluation date <span id="evalLabel" style="color:var(--text)"></span></label>
+          <div class="evalrow">
+            <input type="range" id="evalSlider" min="0" max="100" step="1">
+            <input type="date" id="evalDate">
+          </div>
+        </div>
+        <label class="f" style="width:150px">Price range ±<span id="rangeLabel"></span>
+          <input type="range" id="range" min="5" max="150" step="1">
+        </label>
+      </div>
+      <div class="toggles" style="margin-bottom:8px">
+        <span>Show:</span>
+        <label><input type="checkbox" id="showEval"> <svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="#cfd7ea" stroke-width="2" stroke-dasharray="6 3"/></svg> Eval date</label>
+        <label><input type="checkbox" id="showExpiry"> <svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="#cfd7ea" stroke-width="2.5"/></svg> Final expiry</label>
+        <label><input type="checkbox" id="showToday"> <svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="#cfd7ea" stroke-width="2" stroke-dasharray="1.5 3"/></svg> Today</label>
+      </div>
+      <div class="chart-wrap" id="chartWrap">
+        <canvas id="chart"></canvas>
+        <canvas id="overlay"></canvas>
+        <div class="tooltip" id="tooltip"></div>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="card" id="summaryCard">
+      <div id="summary"></div>
+    </div>
+  </section>
+</main>
+
+<footer>Educational tool. Black-Scholes estimates; real prices vary. Not financial advice.</footer>
+
+<div class="toast" id="toast"></div>
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <h3 id="modalTitle">Import setup</h3>
+    <p id="modalText">Paste a share link (or just the code after <code>#s=</code>).</p>
+    <textarea id="modalArea" spellcheck="false"></textarea>
+    <div class="row">
+      <button class="btn" id="modalCancel">Cancel</button>
+      <button class="btn primary" id="modalOk">Load</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================= Math: Black-Scholes ================= */
+const MULT = 100, DAY = 86400000;
+function normCdf(x){
+  const z = Math.abs(x) / Math.SQRT2, t = 1 / (1 + 0.5 * z);
+  const r = t * Math.exp(-z*z - 1.26551223 + t*(1.00002368 + t*(0.37409196 + t*(0.09678418 + t*(-0.18628806 + t*(0.27886807 + t*(-1.13520398 + t*(1.48851587 + t*(-0.82215223 + t*0.17087277)))))))));
+  return x >= 0 ? 1 - r / 2 : r / 2;
+}
+function normPdf(x){ return Math.exp(-0.5*x*x) / Math.sqrt(2*Math.PI); }
+function intrinsic(type, S, K){ return type === 'call' ? Math.max(0, S - K) : Math.max(0, K - S); }
+// returns {price, delta, gamma, theta (per year), vega (per 1.00 vol)}
+function bs(type, S, K, T, r, q, vol){
+  if (!(T > 0) || !(vol > 0) || !(S > 0) || !(K > 0)){
+    const p = intrinsic(type, Math.max(S,0), K);
+    let d = 0;
+    if (type === 'call') d = S > K ? 1 : 0; else d = S < K ? -1 : 0;
+    return {price: p, delta: d, gamma: 0, theta: 0, vega: 0};
+  }
+  const sq = Math.sqrt(T), vs = vol * sq;
+  const d1 = (Math.log(S/K) + (r - q + 0.5*vol*vol) * T) / vs, d2 = d1 - vs;
+  const dq = Math.exp(-q*T), dr = Math.exp(-r*T), pdf = normPdf(d1);
+  const gamma = dq * pdf / (S * vs), vega = S * dq * pdf * sq;
+  if (type === 'call'){
+    const price = S*dq*normCdf(d1) - K*dr*normCdf(d2);
+    const theta = -S*dq*pdf*vol/(2*sq) - r*K*dr*normCdf(d2) + q*S*dq*normCdf(d1);
+    return {price, delta: dq*normCdf(d1), gamma, theta, vega};
+  } else {
+    const price = K*dr*normCdf(-d2) - S*dq*normCdf(-d1);
+    const theta = -S*dq*pdf*vol/(2*sq) + r*K*dr*normCdf(-d2) - q*S*dq*normCdf(-d1);
+    return {price, delta: -dq*normCdf(-d1), gamma, theta, vega};
+  }
+}
+function impliedVol(type, price, S, K, T, r, q){
+  if (!(T > 0) || !(price > 0) || !(S > 0) || !(K > 0)) return NaN;
+  const dq = Math.exp(-q*T), dr = Math.exp(-r*T);
+  const lower = type === 'call' ? Math.max(0, S*dq - K*dr) : Math.max(0, K*dr - S*dq);
+  const upper = type === 'call' ? S*dq : K*dr;
+  if (price <= lower + 1e-9 || price >= upper) return NaN;
+  let lo = 1e-4, hi = 6;
+  for (let i = 0; i < 200; i++){
+    const mid = 0.5*(lo+hi), p = bs(type, S, K, T, r, q, mid).price;
+    if (Math.abs(p - price) < 1e-10) return mid;
+    if (p > price) hi = mid; else lo = mid;
+  }
+  return 0.5*(lo+hi);
+}
+
+/* ================= Dates ================= */
+function parseDate(s){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return m ? Date.UTC(+m[1], +m[2]-1, +m[3]) : NaN; }
+function fmtISO(ms){ return new Date(ms).toISOString().slice(0,10); }
+function addDays(s, n){ return fmtISO(parseDate(s) + n*DAY); }
+function daysBetween(a, b){ return Math.round((parseDate(b) - parseDate(a)) / DAY); }
+function yearFrac(from, to){ return (parseDate(to) - parseDate(from)) / DAY / 365; }
+function localToday(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function prettyDate(s){ const ms = parseDate(s); return isNaN(ms) ? '—' : new Date(ms).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric', timeZone:'UTC'}); }
+function thirdFriday(y, m){ const first = new Date(Date.UTC(y, m, 1)).getUTCDay(); const d = 1 + ((5 - first + 7) % 7) + 14; return fmtISO(Date.UTC(y, m, d)); }
+function monthlyNear(today, days){
+  const t = new Date(parseDate(addDays(today, days)));
+  let e = thirdFriday(t.getUTCFullYear(), t.getUTCMonth());
+  if (daysBetween(today, e) < 7){ const n = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth()+1, 1)); e = thirdFriday(n.getUTCFullYear(), n.getUTCMonth()); }
+  return e;
+}
+
+/* ================= Formatting ================= */
+const nf0 = new Intl.NumberFormat('en-US', {maximumFractionDigits:0});
+const nf2 = new Intl.NumberFormat('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+function money(v, signed){
+  if (!isFinite(v)) return '—';
+  const r = Math.round(v); const s = (r < 0 ? '−' : (signed && r > 0 ? '+' : '')) + '$' + nf0.format(Math.abs(r));
+  return s;
+}
+function moneySmall(v){ if (!isFinite(v)) return '—'; if (Math.abs(v) >= 100) return money(v, true); return (v < -0.005 ? '−' : v > 0.005 ? '+' : '') + '$' + nf2.format(Math.abs(v)); }
+function moneyCls(v){ return v > 0.5 ? 'pos' : v < -0.5 ? 'neg' : ''; }
+function axisMoney(v){
+  const a = Math.abs(v), s = v < 0 ? '−' : '';
+  if (a >= 1e6) return s + '$' + (a/1e6).toFixed(a >= 1e7 ? 0 : 1) + 'M';
+  if (a >= 1e3) return s + '$' + (a/1e3).toFixed(a >= 1e4 ? 0 : 1).replace(/\.0$/,'') + 'k';
+  return s + '$' + a.toFixed(0);
+}
+function px(v){ return '$' + nf2.format(v); }
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function round2(v){ return Math.round(v*100)/100; }
+function niceStrike(v){ const inc = v < 25 ? 0.5 : v < 100 ? 1 : v < 250 ? 2.5 : 5; return Math.max(inc, Math.round(v/inc)*inc); }
+
+/* ================= State ================= */
+const COLORS = ['#5b9cff', '#34d399', '#fbbf24'];
+let state = null;
+const mkt = () => ({S: state.spot, r: state.rate/100, q: state.div/100, today: state.today});
+
+function legMult(l){ return l.type === 'stock' ? 1 : MULT; }
+function legSign(l){ return l.side === 'short' ? -1 : 1; }
+function legValue(l, S, date, m){
+  if (l.type === 'stock') return S;
+  const T = yearFrac(date, l.expiry);
+  if (!(T > 0)) return intrinsic(l.type, S, l.strike);
+  return bs(l.type, S, l.strike, T, m.r, m.q, l.iv/100).price;
+}
+function positionPL(legs, S, date, m){
+  let pl = 0;
+  for (const l of legs) pl += legSign(l) * l.qty * legMult(l) * (legValue(l, S, date, m) - l.premium);
+  return pl;
+}
+function finalExpiry(sc){
+  let e = null;
+  for (const l of sc.legs) if (l.type !== 'stock' && !isNaN(parseDate(l.expiry)) && (!e || l.expiry > e)) e = l.expiry;
+  return e || state.today;
+}
+function maxExpiryAll(){
+  let e = state.today;
+  for (const sc of state.scenarios){ const f = finalExpiry(sc); if (f > e) e = f; }
+  return e;
+}
+function netCost(legs){ let c = 0; for (const l of legs) c += legSign(l) * l.qty * legMult(l) * l.premium; return c; } // + = debit
+
+// Exact analysis at final expiry (all legs intrinsic → piecewise linear)
+function expiryAnalysis(legs){
+  const nodes = [0, ...new Set(legs.filter(l => l.type !== 'stock').map(l => l.strike).filter(k => k > 0))].sort((a,b)=>a-b);
+  const f = S => { let pl = 0; for (const l of legs) pl += legSign(l)*l.qty*legMult(l)*((l.type==='stock'?S:intrinsic(l.type,S,l.strike)) - l.premium); return pl; };
+  let slope = 0; for (const l of legs) if (l.type === 'call' || l.type === 'stock') slope += legSign(l)*l.qty*legMult(l);
+  const vals = nodes.map(f);
+  let maxP = Math.max(...vals), minP = Math.min(...vals);
+  const unlimitedProfit = slope > 1e-9, unlimitedLoss = slope < -1e-9;
+  const bes = [];
+  const push = x => { if (x >= 0 && !bes.some(b => Math.abs(b - x) < 1e-6)) bes.push(x); };
+  for (let i = 0; i < nodes.length; i++){
+    if (Math.abs(vals[i]) < 1e-7 && legs.length) {
+      // touching zero at node: count only if sign changes around it
+      const lv = i > 0 ? vals[i-1] : null, rv = i < nodes.length-1 ? vals[i+1] : vals[i] + slope;
+      if (lv === null || Math.sign(lv) !== Math.sign(rv)) push(nodes[i]);
+    }
+    if (i < nodes.length-1){
+      const a = vals[i], b = vals[i+1];
+      if ((a < -1e-7 && b > 1e-7) || (a > 1e-7 && b < -1e-7)) push(nodes[i] + (nodes[i+1]-nodes[i]) * (-a)/(b-a));
+    }
+  }
+  const last = nodes[nodes.length-1], lv = vals[vals.length-1];
+  if ((lv < -1e-7 && slope > 1e-9) || (lv > 1e-7 && slope < -1e-9)) push(last - lv/slope);
+  bes.sort((a,b)=>a-b);
+  return {maxProfit: unlimitedProfit ? Infinity : maxP, maxLoss: unlimitedLoss ? -Infinity : minP, breakevens: bes, f};
+}
+// Numeric breakevens for a date
+function numericBreakevens(legs, date, m){
+  if (!legs.length) return [];
+  const hiK = Math.max(m.S, ...legs.map(l => l.strike || 0));
+  const lo = 0.01, hi = hiK * 3, N = 1500, out = [];
+  let px0 = lo, v0 = positionPL(legs, px0, date, m);
+  for (let i = 1; i <= N; i++){
+    const x = lo + (hi-lo)*i/N, v = positionPL(legs, x, date, m);
+    if ((v0 < 0 && v >= 0) || (v0 > 0 && v <= 0)){
+      let a = px0, b = x, fa = v0;
+      for (let k = 0; k < 60; k++){ const c = 0.5*(a+b), fc = positionPL(legs, c, date, m); if ((fa < 0) === (fc < 0)){ a = c; fa = fc; } else b = c; }
+      const r = 0.5*(a+b); if (!out.some(o => Math.abs(o-r) < 0.01)) out.push(r);
+    }
+    px0 = x; v0 = v;
+  }
+  return out;
+}
+function greeksToday(legs, m){
+  const g = {delta:0, gamma:0, theta:0, vega:0};
+  for (const l of legs){
+    const k = legSign(l) * l.qty * legMult(l);
+    if (l.type === 'stock'){ g.delta += k; continue; }
+    const T = yearFrac(m.today, l.expiry);
+    const r = bs(l.type, m.S, l.strike, T, m.r, m.q, l.iv/100);
+    g.delta += k*r.delta; g.gamma += k*r.gamma; g.theta += k*r.theta/365; g.vega += k*r.vega/100;
+  }
+  return g;
+}
+
+/* ================= Defaults & presets ================= */
+function newLeg(type, side, qty, strike, expiry, iv, premium){
+  const l = {type, side, qty, strike: type === 'stock' ? 0 : strike, expiry: type === 'stock' ? '' : expiry, iv: iv ?? 35, premium: 0};
+  if (premium != null) l.premium = premium;
+  else if (type === 'stock') l.premium = round2(state.spot);
+  else l.premium = round2(bs(type, state.spot, strike, yearFrac(state.today, expiry), state.rate/100, state.div/100, l.iv/100).price);
+  return l;
+}
+function amznState(){
+  const today = '2026-10-07', S = 254.37, r = 0.04;
+  const ivOf = (type, p, K, exp, fb) => { const v = impliedVol(type, p, S, K, yearFrac(today, exp), r, 0); return isFinite(v) ? round2(v*100) : fb; };
+  const ivLong = ivOf('call', 23.35, 280, '2027-06-17', 36);   // from current mark 23.35
+  const ivDec = ivOf('call', 3.80, 305, '2026-12-18', 33);
+  const ivJun305 = ivOf('call', 18.10, 305, '2027-06-17', 38.8);
+  const long = () => ({type:'call', side:'long', qty:5, strike:280, expiry:'2027-06-17', premium:22.21, iv:ivLong});
+  return {
+    v:1, ticker:'AMZN', spot:S, rate:4, div:0, today, evalDate:'2026-12-18', range:40, target:305,
+    show:{eval:true, expiry:true, today:false}, active:2,
+    scenarios:[
+      {name:'LEAPS alone (Jun \'27 $280)', color:COLORS[0], visible:true, legs:[long()]},
+      {name:'LEAPS + short Dec $305', color:COLORS[1], visible:true, legs:[long(), {type:'call', side:'short', qty:5, strike:305, expiry:'2026-12-18', premium:3.80, iv:ivDec}]},
+      {name:'Bull call spread 280/305 (Jun)', color:COLORS[2], visible:true, legs:[long(), {type:'call', side:'short', qty:5, strike:305, expiry:'2027-06-17', premium:18.10, iv:ivJun305}]},
+    ]
+  };
+}
+function applyPreset(key){
+  if (key === 'amzn'){ state = amznState(); renderAll(); toast('Loaded AMZN example'); return; }
+  const S = state.spot, t = state.today, sc = activeSc();
+  const e45 = monthlyNear(t, 45), e60 = monthlyNear(t, 60), e90 = monthlyNear(t, 90), e365 = monthlyNear(t, 365);
+  const K = f => niceStrike(S*f);
+  const P = {
+    longcall: ['Long call', () => [newLeg('call','long',1,K(1.05),e90)]],
+    covered:  ['Covered call', () => [newLeg('stock','long',100), newLeg('call','short',1,K(1.10),e45)]],
+    pmcc:     ["Poor man's covered call", () => [newLeg('call','long',1,K(0.80),e365), newLeg('call','short',1,K(1.10),e45)]],
+    bullcall: ['Bull call spread', () => [newLeg('call','long',1,K(1.00),e90), newLeg('call','short',1,K(1.10),e90)]],
+    csp:      ['Cash-secured put', () => [newLeg('put','short',1,K(0.92),e45)]],
+    collar:   ['Collar', () => [newLeg('stock','long',100), newLeg('put','long',1,K(0.90),e60), newLeg('call','short',1,K(1.10),e60)]],
+    rr:       ['Risk reversal', () => [newLeg('put','short',1,K(0.90),e90), newLeg('call','long',1,K(1.10),e90)]],
+  }[key];
+  if (!P) return;
+  sc.name = P[0]; sc.legs = P[1]();
+  state.evalDate = clampEval(state.evalDate);
+  renderAll(); toast('Preset applied to "' + sc.name + '" (premiums are model estimates at 35% IV; edit them to your fills)');
+}
+
+function sanitize(s){
+  const d = amznState();
+  if (!s || typeof s !== 'object') return d;
+  const num = (v, fb) => (typeof v === 'number' && isFinite(v)) ? v : (isFinite(parseFloat(v)) ? parseFloat(v) : fb);
+  const date = (v, fb) => isNaN(parseDate(v)) ? fb : v;
+  const out = {
+    v:1, ticker: String(s.ticker ?? d.ticker).slice(0,12), spot: Math.max(0.01, num(s.spot, d.spot)), rate: num(s.rate, 4), div: Math.max(0, num(s.div, 0)),
+    today: date(s.today, localToday()), evalDate: date(s.evalDate, null), range: Math.min(150, Math.max(5, num(s.range, 40))), target: num(s.target, NaN),
+    show: {eval: s.show ? !!s.show.eval : true, expiry: s.show ? !!s.show.expiry : true, today: s.show ? !!s.show.today : false},
+    active: 0, scenarios: []
+  };
+  const scs = Array.isArray(s.scenarios) ? s.scenarios.slice(0,3) : [];
+  for (let i = 0; i < scs.length; i++){
+    const sc = scs[i] || {};
+    out.scenarios.push({
+      name: String(sc.name ?? ('Scenario ' + (i+1))).slice(0,60),
+      color: /^#[0-9a-f]{6}$/i.test(sc.color) ? sc.color : COLORS[i],
+      visible: sc.visible !== false,
+      legs: (Array.isArray(sc.legs) ? sc.legs : []).slice(0,20).map(l => ({
+        type: ['call','put','stock'].includes(l.type) ? l.type : 'call',
+        side: l.side === 'short' ? 'short' : 'long',
+        qty: Math.max(0, num(l.qty, 1)), strike: Math.max(0, num(l.strike, 0)),
+        expiry: date(l.expiry, l.type === 'stock' ? '' : addDays(out.today, 30)),
+        premium: Math.max(0, num(l.premium, 0)), iv: Math.max(0.1, num(l.iv, 35))
+      }))
+    });
+  }
+  if (!out.scenarios.length) out.scenarios.push({name:'Scenario 1', color:COLORS[0], visible:true, legs:[]});
+  out.active = Math.min(out.scenarios.length-1, Math.max(0, Math.floor(num(s.active, 0))));
+  if (!isFinite(out.target)) out.target = round2(out.spot);
+  state = out; // needed for clamp
+  out.evalDate = clampEval(out.evalDate || out.today);
+  return out;
+}
+function clampEval(d){
+  const max = maxExpiryAll();
+  if (isNaN(parseDate(d)) || d < state.today) return state.today;
+  if (d > max) return max;
+  return d;
+}
+const activeSc = () => state.scenarios[state.active];
+
+/* ================= Persistence / sharing ================= */
+const LS_KEY = 'optviz.state.v1';
+function encodeState(s){ return btoa(unescape(encodeURIComponent(JSON.stringify(s)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function decodeState(code){
+  let c = code.trim(); const i = c.indexOf('#s='); if (i >= 0) c = c.slice(i+3); else if (c.startsWith('s=')) c = c.slice(2);
+  c = c.replace(/-/g,'+').replace(/_/g,'/'); while (c.length % 4) c += '=';
+  return JSON.parse(decodeURIComponent(escape(atob(c))));
+}
+let saveTimer = null, lastHash = '';
+function persist(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const code = encodeState(state);
+    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e){}
+    lastHash = '#s=' + code;
+    try { history.replaceState(null, '', lastHash); } catch(e){ try { location.hash = lastHash; } catch(_){} }
+  }, 200);
+}
+function shareLink(){ return location.href.split('#')[0] + '#s=' + encodeState(state); }
+function loadInitial(){
+  if (location.hash.startsWith('#s=')){ try { return sanitize(decodeState(location.hash)); } catch(e){ console.warn('Bad share link', e); } }
+  try { const raw = localStorage.getItem(LS_KEY); if (raw) return sanitize(JSON.parse(raw)); } catch(e){}
+  return sanitize(amznState());
+}
+window.addEventListener('hashchange', () => {
+  if (location.hash === lastHash || !location.hash.startsWith('#s=')) return;
+  try { state = sanitize(decodeState(location.hash)); renderAll(); toast('Loaded setup from link'); } catch(e){}
+});
+
+/* ================= UI helpers ================= */
+const $ = s => document.querySelector(s);
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600); }
+
+function renderAll(){ renderMarket(); renderScenarios(); renderLegs(); update(); }
+function renderMarket(){
+  $('#ticker').value = state.ticker; $('#spot').value = state.spot; $('#rate').value = state.rate; $('#div').value = state.div; $('#today').value = state.today;
+  $('#range').value = state.range; $('#showEval').checked = state.show.eval; $('#showExpiry').checked = state.show.expiry; $('#showToday').checked = state.show.today;
+}
+function renderScenarios(){
+  const box = $('#scenTabs'); box.innerHTML = '';
+  state.scenarios.forEach((sc, i) => {
+    const d = document.createElement('div');
+    d.className = 'scen-tab' + (i === state.active ? ' active' : ''); d.style.setProperty('--sc', sc.color); d.dataset.i = i;
+    d.innerHTML = `<input type="color" value="${sc.color}" title="Line color" data-act="color"><span class="nm" title="${esc(sc.name)}">${esc(sc.name || ('Scenario ' + (i+1)))}</span>
+      <button class="eye ${sc.visible ? '' : 'off'}" data-act="eye" title="${sc.visible ? 'Hide from chart' : 'Show on chart'}">👁</button>
+      ${state.scenarios.length > 1 ? '<button class="x" data-act="del" title="Delete scenario">×</button>' : ''}`;
+    box.appendChild(d);
+  });
+  if (state.scenarios.length < 3){
+    const b = document.createElement('button'); b.className = 'btn sm'; b.id = 'addScen'; b.textContent = '+ Add scenario (copy of current)';
+    box.appendChild(b);
+  }
+  $('#scenName').value = activeSc().name;
+}
+function legRow(l, i){
+  const isStock = l.type === 'stock';
+  const tr = document.createElement('tr'); tr.className = l.side; tr.dataset.i = i;
+  tr.innerHTML = `
+    <td><select data-k="type"><option value="call"${l.type==='call'?' selected':''}>Call</option><option value="put"${l.type==='put'?' selected':''}>Put</option><option value="stock"${isStock?' selected':''}>Stock</option></select></td>
+    <td><select class="side" data-k="side"><option value="long"${l.side==='long'?' selected':''}>Long</option><option value="short"${l.side==='short'?' selected':''}>Short</option></select></td>
+    <td><input type="number" data-k="qty" min="0" step="1" value="${l.qty}" title="${isStock ? 'Shares' : 'Contracts (×100)'}"></td>
+    <td><input type="number" data-k="strike" min="0" step="0.5" value="${isStock ? '' : l.strike}" ${isStock ? 'disabled placeholder="—"' : ''}></td>
+    <td><input type="date" data-k="expiry" value="${isStock ? '' : l.expiry}" ${isStock ? 'disabled' : ''}></td>
+    <td><input type="number" data-k="premium" min="0" step="0.01" value="${l.premium}" title="${isStock ? 'Cost per share' : 'Premium per share'}"></td>
+    <td><input type="number" data-k="iv" min="0.1" step="0.1" value="${isStock ? '' : l.iv}" ${isStock ? 'disabled placeholder="—"' : ''}></td>
+    <td class="theo" data-theo></td>
+    <td><div class="acts">
+      ${isStock ? '' : '<button class="btn icon" data-act="solve" title="Solve IV from Entry $ at today\'s stock price">IV⟲</button>'}
+      <button class="btn icon" data-act="dup" title="Duplicate leg"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" style="vertical-align:-1px"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"/></svg></button>
+      <button class="btn icon" data-act="del" title="Remove leg">✕</button></div></td>`;
+  return tr;
+}
+function renderLegs(){
+  const tb = $('#legsBody'); tb.innerHTML = '';
+  const legs = activeSc().legs;
+  if (!legs.length){ tb.innerHTML = '<tr><td colspan="9" class="empty">No legs yet. Add a call, put, or stock, or load a preset.</td></tr>'; return; }
+  legs.forEach((l, i) => tb.appendChild(legRow(l, i)));
+}
+function updateTheo(){
+  const m = mkt(); const legs = activeSc().legs;
+  document.querySelectorAll('#legsBody tr[data-i]').forEach(tr => {
+    const l = legs[+tr.dataset.i]; if (!l) return;
+    const cell = tr.querySelector('[data-theo]');
+    const v = legValue(l, m.S, m.today, m);
+    const pl = legSign(l) * l.qty * legMult(l) * (v - l.premium);
+    cell.innerHTML = `${px(v)}<br><span class="${moneyCls(pl)}">${money(pl, true)}</span>`;
+    cell.title = 'Model value per share today, and leg P/L vs entry';
+  });
+}
+
+/* ================= Main update ================= */
+function update(){
+  state.evalDate = clampEval(state.evalDate);
+  const maxD = Math.max(0, daysBetween(state.today, maxExpiryAll()));
+  const sl = $('#evalSlider'); sl.max = maxD; sl.value = daysBetween(state.today, state.evalDate);
+  const ed = $('#evalDate'); ed.min = state.today; ed.max = maxExpiryAll(); ed.value = state.evalDate;
+  const dd = daysBetween(state.today, state.evalDate);
+  $('#evalLabel').textContent = `${prettyDate(state.evalDate)} · ${dd === 0 ? 'today' : dd + ' days out'}`;
+  $('#rangeLabel').textContent = state.range + '%';
+  updateTheo();
+  drawChart();
+  renderSummary();
+  persist();
+}
+
+/* ================= Chart ================= */
+const chart = {series: [], geo: null};
+function buildSeries(){
+  const m = mkt(); const out = [];
+  const order = state.scenarios.map((sc, i) => i).filter(i => state.scenarios[i].visible || i === state.active);
+  // draw active last (on top)
+  order.sort((a, b) => (a === state.active) - (b === state.active));
+  for (const i of order){
+    const sc = state.scenarios[i]; if (!sc.legs.length) continue;
+    const fe = finalExpiry(sc); const active = i === state.active;
+    if (state.show.today) out.push({sc, i, active, kind:'today', date: state.today, label: 'Today', dash:[1.5, 4]});
+    if (state.show.eval) out.push({sc, i, active, kind:'eval', date: state.evalDate, label: 'Eval ' + prettyDate(state.evalDate).replace(/, \d{4}$/, ''), dash:[7, 4]});
+    if (state.show.expiry) out.push({sc, i, active, kind:'expiry', date: fe, label: 'Expiry ' + prettyDate(fe), dash:[]});
+  }
+  return out;
+}
+function niceStep(range, count){ const raw = range / Math.max(1, count); const p = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; }
+function drawChart(){
+  const cv = $('#chart'), ov = $('#overlay'), wrap = $('#chartWrap');
+  const W = wrap.clientWidth, H = wrap.clientHeight, dpr = window.devicePixelRatio || 1;
+  for (const c of [cv, ov]){ c.width = Math.round(W*dpr); c.height = Math.round(H*dpr); }
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  const m = mkt();
+  const xMin = Math.max(0, m.S * (1 - state.range/100)), xMax = m.S * (1 + state.range/100);
+  const series = buildSeries(); const N = Math.max(200, Math.min(600, Math.round(W)));
+  let yMin = 0, yMax = 0;
+  for (const s of series){
+    s.pts = [];
+    for (let k = 0; k <= N; k++){ const x = xMin + (xMax - xMin) * k / N; const y = positionPL(s.sc.legs, x, s.date, m); s.pts.push([x, y]); if (y < yMin) yMin = y; if (y > yMax) yMax = y; }
+  }
+  if (yMax - yMin < 1){ yMax += 100; yMin -= 100; }
+  const padY = (yMax - yMin) * 0.08; yMax += padY; yMin -= padY;
+  const L = 64, R = 16, T = 18, B = 34;
+  const pw = W - L - R, ph = H - T - B;
+  const X = x => L + (x - xMin) / (xMax - xMin) * pw, Y = y => T + (yMax - y) / (yMax - yMin) * ph;
+  chart.series = series; chart.geo = {L, R, T, B, pw, ph, xMin, xMax, yMin, yMax, X, Y, W, H};
+  ctx.font = '11px system-ui, sans-serif'; ctx.textBaseline = 'middle';
+  // grid
+  const ys = niceStep(yMax - yMin, Math.max(3, Math.floor(ph / 55)));
+  ctx.strokeStyle = 'rgba(140,155,190,0.10)'; ctx.lineWidth = 1; ctx.fillStyle = '#7d89a8'; ctx.textAlign = 'right';
+  for (let v = Math.ceil(yMin / ys) * ys; v <= yMax; v += ys){ const y = Math.round(Y(v)) + 0.5; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(L + pw, y); ctx.stroke(); ctx.fillText(axisMoney(v), L - 8, y); }
+  const xs = niceStep(xMax - xMin, Math.max(3, Math.floor(pw / 80)));
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let v = Math.ceil(xMin / xs) * xs; v <= xMax; v += xs){ const x = Math.round(X(v)) + 0.5; ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, T + ph); ctx.stroke(); ctx.fillText('$' + (xs < 1 ? v.toFixed(1) : nf0.format(v)), x, T + ph + 8); }
+  // zero line
+  if (yMin < 0 && yMax > 0){ ctx.strokeStyle = 'rgba(200,210,235,0.45)'; ctx.lineWidth = 1; const y = Math.round(Y(0)) + 0.5; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(L + pw, y); ctx.stroke(); }
+  // fill under active primary curve
+  const prim = series.filter(s => s.active).find(s => s.kind === 'expiry') || series.find(s => s.active);
+  if (prim){
+    const y0 = Math.max(T, Math.min(T + ph, Y(0)));
+    const path = () => { ctx.beginPath(); ctx.moveTo(X(prim.pts[0][0]), y0); for (const [x, y] of prim.pts) ctx.lineTo(X(x), Y(y)); ctx.lineTo(X(prim.pts[prim.pts.length-1][0]), y0); ctx.closePath(); };
+    ctx.save(); ctx.beginPath(); ctx.rect(L, T, pw, y0 - T); ctx.clip(); path(); ctx.fillStyle = 'rgba(52,211,153,0.10)'; ctx.fill(); ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.rect(L, y0, pw, T + ph - y0); ctx.clip(); path(); ctx.fillStyle = 'rgba(248,113,113,0.10)'; ctx.fill(); ctx.restore();
+  }
+  // vertical markers
+  const vline = (x, color, dash, label, row) => {
+    if (x < xMin || x > xMax) return;
+    const px_ = Math.round(X(x)) + 0.5; ctx.save(); ctx.strokeStyle = color; ctx.setLineDash(dash); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px_, T); ctx.lineTo(px_, T + ph); ctx.stroke(); ctx.restore();
+    if (label){ ctx.save(); ctx.font = '600 10.5px system-ui, sans-serif'; const tw = ctx.measureText(label).width + 10; let lx = px_ - tw/2; lx = Math.max(L, Math.min(L + pw - tw, lx)); const ly = T + 2 + row*17;
+      ctx.fillStyle = 'rgba(10,15,29,0.9)'; ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.setLineDash([]); roundRect(ctx, lx, ly, tw, 15, 4); ctx.fill(); ctx.stroke(); ctx.fillStyle = color; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(label, lx + 5, ly + 7.5); ctx.restore(); }
+  };
+  const sc = activeSc(); const an = sc.legs.length ? expiryAnalysis(sc.legs) : null;
+  if (an && state.show.expiry) an.breakevens.forEach((b, k) => vline(b, '#c4b5fd', [3, 3], 'BE ' + px(b), 1 + (k % 2)));
+  if (isFinite(state.target) && state.target > 0) vline(state.target, '#f472b6', [2, 4], 'Target ' + px(state.target), 3);
+  vline(m.S, '#e7ecf6', [5, 4], (state.ticker || 'Spot') + ' ' + px(m.S), 0);
+  // curves
+  ctx.save(); ctx.beginPath(); ctx.rect(L, T, pw, ph); ctx.clip();
+  for (const s of series){
+    ctx.strokeStyle = s.sc.color; ctx.globalAlpha = s.active ? 1 : 0.75; ctx.lineWidth = (s.active ? 2.6 : 1.7) * (s.kind === 'expiry' ? 1 : 0.9);
+    ctx.setLineDash(s.dash); ctx.lineJoin = 'round'; ctx.beginPath();
+    s.pts.forEach(([x, y], k) => k ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))); ctx.stroke();
+  }
+  ctx.restore(); ctx.globalAlpha = 1; ctx.setLineDash([]);
+  // frame
+  ctx.strokeStyle = 'rgba(140,155,190,0.25)'; ctx.strokeRect(L + 0.5, T + 0.5, pw, ph);
+  if (!series.length){ ctx.fillStyle = '#7d89a8'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '13px system-ui'; ctx.fillText('Add legs to see the payoff', L + pw/2, T + ph/2); }
+  renderLegend(series);
+  hideHover();
+}
+function roundRect(ctx, x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function dashSvg(color, dash, w){ return `<svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="${color}" stroke-width="${w}" ${dash.length ? `stroke-dasharray="${dash.join(' ')}"` : ''}/></svg>`; }
+function renderLegend(series){
+  const seen = new Map(); for (const s of series) if (!seen.has(s.i)) seen.set(s.i, s.sc);
+  let h = ''; for (const [i, sc] of seen) h += `<span class="it" style="${i === state.active ? 'color:var(--text);font-weight:600' : ''}"><span class="sw" style="background:${sc.color}"></span>${esc(sc.name)}${i === state.active ? ' (editing)' : ''}</span>`;
+  h += `<span class="it"><span class="sw" style="background:rgba(52,211,153,.35)"></span>profit / <span class="sw" style="background:rgba(248,113,113,.35)"></span>loss zone (editing, final expiry)</span>`;
+  $('#legend').innerHTML = h;
+}
+function hideHover(){ const ov = $('#overlay'); ov.getContext('2d').clearRect(0, 0, ov.width, ov.height); $('#tooltip').style.display = 'none'; }
+function onHover(ev){
+  const g = chart.geo; if (!g || !chart.series.length) return;
+  const rect = $('#overlay').getBoundingClientRect(); const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+  if (mx < g.L || mx > g.L + g.pw || my < 0 || my > g.H){ hideHover(); return; }
+  const S = g.xMin + (mx - g.L) / g.pw * (g.xMax - g.xMin); const m = mkt();
+  const ov = $('#overlay'), ctx = ov.getContext('2d'), dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, g.W, g.H);
+  ctx.strokeStyle = 'rgba(231,236,246,0.5)'; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(Math.round(mx) + 0.5, g.T); ctx.lineTo(Math.round(mx) + 0.5, g.T + g.ph); ctx.stroke(); ctx.setLineDash([]);
+  let rows = '';
+  const list = [...chart.series].reverse();
+  for (const s of list){
+    const v = positionPL(s.sc.legs, S, s.date, m); const y = g.Y(v);
+    if (y >= g.T && y <= g.T + g.ph){ ctx.fillStyle = s.sc.color; ctx.beginPath(); ctx.arc(mx, y, s.active ? 4 : 3, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#0a0f1d'; ctx.lineWidth = 1.5; ctx.stroke(); }
+    rows += `<div class="row"><span class="l">${dashSvg(s.sc.color, s.dash, 2.2)}<span style="max-width:170px;overflow:hidden;text-overflow:ellipsis">${esc(s.sc.name)}</span> · ${esc(s.label)}</span><span class="v ${moneyCls(v)}">${money(v, true)}</span></div>`;
+  }
+  const pct = (S / m.S - 1) * 100;
+  const tt = $('#tooltip'); tt.innerHTML = `<div class="th">${esc(state.ticker || 'Price')} ${px(S)} <span style="color:var(--muted);font-weight:400">(${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%)</span></div>${rows}`;
+  tt.style.display = 'block';
+  const tw = tt.offsetWidth, th = tt.offsetHeight;
+  let tx = mx + 16; if (tx + tw > g.W - 4) tx = mx - tw - 16; tx = Math.max(4, tx);
+  let ty = my - th / 2; ty = Math.max(4, Math.min(g.H - th - 4, ty));
+  tt.style.left = tx + 'px'; tt.style.top = ty + 'px';
+}
+
+/* ================= Summary ================= */
+function stat(k, v, cls, sub){ return `<div class="stat"><div class="k">${k}</div><div class="val ${cls || ''}">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`; }
+function renderSummary(){
+  const sc = activeSc(), m = mkt(), legs = sc.legs;
+  let h = `<div class="sumhead"><span class="sw" style="background:${sc.color}"></span>${esc(sc.name)}<span class="line"></span></div>`;
+  if (!legs.length){ $('#summary').innerHTML = h + '<div class="empty">No legs in this scenario.</div>'; renderCompare(); return; }
+  const cost = netCost(legs), fe = finalExpiry(sc), an = expiryAnalysis(legs);
+  const nowPL = positionPL(legs, m.S, m.today, m);
+  const fmtMax = (v, isProfit) => !isFinite(v) ? 'Unlimited' : money(v, true);
+  const beStr = arr => arr.length ? arr.map(b => px(b)).join(', ') : 'None';
+  const beEval = numericBreakevens(legs, state.evalDate, m);
+  h += `<div class="stats">
+    ${stat(cost >= 0 ? 'Net debit' : 'Net credit', money(Math.abs(cost)), cost >= 0 ? '' : 'pos', cost >= 0 ? 'paid to open' : 'received to open')}
+    ${stat('Max profit', fmtMax(an.maxProfit, true), 'pos', 'at ' + prettyDate(fe))}
+    ${stat('Max loss', fmtMax(an.maxLoss, false), 'neg', 'at ' + prettyDate(fe))}
+    ${stat('Breakeven' + (an.breakevens.length > 1 ? 's' : ''), beStr(an.breakevens), '', 'at ' + prettyDate(fe))}
+    ${stat('Breakeven' + (beEval.length > 1 ? 's' : '') + ' (eval)', beStr(beEval), '', 'at ' + prettyDate(state.evalDate))}
+    ${stat('Model P/L now', money(nowPL, true), moneyCls(nowPL), 'at ' + px(m.S) + ', today')}
+  </div>`;
+  h += `<div class="sumhead">P/L at target<span class="target-in"><input type="number" id="target" step="0.5" min="0" value="${isFinite(state.target) ? state.target : ''}"></span><span class="line"></span></div>`;
+  if (isFinite(state.target) && state.target > 0){
+    const T = state.target;
+    const a = positionPL(legs, T, m.today, m), b = positionPL(legs, T, state.evalDate, m), c = an.f(T);
+    h += `<div class="stats">${stat('Today', money(a, true), moneyCls(a), prettyDate(m.today))}${stat('Eval date', money(b, true), moneyCls(b), prettyDate(state.evalDate))}${stat('Final expiry', money(c, true), moneyCls(c), prettyDate(fe))}</div>`;
+  }
+  const g = greeksToday(legs, m);
+  h += `<div class="sumhead">Net Greeks today<span class="line"></span></div><div class="stats">
+    ${stat('Delta', (g.delta >= 0 ? '+' : '') + g.delta.toFixed(1), '', '≈ shares; $ per $1 move')}
+    ${stat('Gamma', (g.gamma >= 0 ? '+' : '') + g.gamma.toFixed(2), '', 'Δ change per $1 move')}
+    ${stat('Theta / day', moneySmall(g.theta), moneyCls(g.theta), 'time decay per day')}
+    ${stat('Vega', moneySmall(g.vega), '', 'per +1 pt IV')}
+  </div>`;
+  h += `<div class="hint">Max profit/loss and the first breakeven use intrinsic value at the final expiry (${prettyDate(fe)}). Legs that expire earlier are valued at intrinsic at that same price, a standard simplification.</div>`;
+  $('#summary').innerHTML = h;
+  renderCompare();
+}
+function renderCompare(){
+  const m = mkt(); const T = state.target;
+  let h = `<tr><th>Scenario</th><th>Net cost</th><th>Max profit</th><th>Max loss</th><th>Breakeven</th><th>@Target eval</th><th>@Target expiry</th></tr>`;
+  state.scenarios.forEach((sc, i) => {
+    if (!sc.legs.length){ h += `<tr><td><span class="sw" style="background:${sc.color}"></span> ${esc(sc.name)}</td><td colspan="6" style="text-align:left;color:var(--dim)">no legs</td></tr>`; return; }
+    const an = expiryAnalysis(sc.legs), c = netCost(sc.legs);
+    const te = isFinite(T) ? positionPL(sc.legs, T, state.evalDate, m) : NaN, tf = isFinite(T) ? an.f(T) : NaN;
+    h += `<tr style="${i === state.active ? 'font-weight:600' : ''}"><td><span class="sw" style="background:${sc.color}"></span> ${esc(sc.name)}</td>
+      <td>${c >= 0 ? money(c) + ' dr' : money(-c) + ' cr'}</td>
+      <td class="pos">${isFinite(an.maxProfit) ? money(an.maxProfit, true) : 'Unlimited'}</td>
+      <td class="neg">${isFinite(an.maxLoss) ? money(an.maxLoss, true) : 'Unlimited'}</td>
+      <td>${an.breakevens.length ? an.breakevens.map(px).join(', ') : '—'}</td>
+      <td class="${moneyCls(te)}">${money(te, true)}</td><td class="${moneyCls(tf)}">${money(tf, true)}</td></tr>`;
+  });
+  $('#cmpTable').innerHTML = h;
+}
+
+/* ================= Events ================= */
+function bindMarket(id, key, parse){
+  $('#' + id).addEventListener('input', e => {
+    const v = parse(e.target.value); if (v === null) return;
+    state[key] = v;
+    if (key === 'ticker'){ update(); return; }
+    update();
+  });
+}
+const pnum = (min) => v => { const n = parseFloat(v); return isFinite(n) && (min == null || n >= min) ? n : null; };
+bindMarket('ticker', 'ticker', v => v.toUpperCase().slice(0,12));
+bindMarket('spot', 'spot', v => { const n = parseFloat(v); return n > 0 ? n : null; });
+bindMarket('rate', 'rate', pnum());
+bindMarket('div', 'div', pnum(0));
+bindMarket('today', 'today', v => isNaN(parseDate(v)) ? null : v);
+$('#range').addEventListener('input', e => { state.range = +e.target.value; update(); });
+$('#evalSlider').addEventListener('input', e => { state.evalDate = addDays(state.today, +e.target.value); update(); });
+$('#evalDate').addEventListener('change', e => { if (!isNaN(parseDate(e.target.value))){ state.evalDate = e.target.value; update(); } });
+['Eval','Expiry','Today'].forEach(k => $('#show' + k).addEventListener('change', e => { state.show[k.toLowerCase()] = e.target.checked; update(); }));
+$('#summary').addEventListener('input', e => { if (e.target.id === 'target'){ const n = parseFloat(e.target.value); state.target = isFinite(n) ? n : NaN;
+  // re-render summary without losing focus
+  const pos = e.target.selectionStart; drawChart(); renderSummary(); persist(); const t = $('#target'); t.focus(); try { t.setSelectionRange(pos, pos); } catch(_){} } });
+$('#scenName').addEventListener('input', e => { activeSc().name = e.target.value; const tab = document.querySelector(`.scen-tab[data-i="${state.active}"] .nm`); if (tab) tab.textContent = e.target.value || ('Scenario ' + (state.active+1)); drawChart(); renderSummary(); persist(); });
+$('#preset').addEventListener('change', e => { const v = e.target.value; e.target.value = ''; if (v) applyPreset(v); });
+
+$('#scenTabs').addEventListener('click', e => {
+  if (e.target.id === 'addScen'){
+    if (state.scenarios.length >= 3) return;
+    const src = activeSc(); const used = state.scenarios.map(s => s.color);
+    state.scenarios.push({name: src.name + ' (copy)', color: COLORS.find(c => !used.includes(c)) || COLORS[state.scenarios.length], visible: true, legs: JSON.parse(JSON.stringify(src.legs))});
+    state.active = state.scenarios.length - 1; renderAll(); return;
+  }
+  const tab = e.target.closest('.scen-tab'); if (!tab) return; const i = +tab.dataset.i; const act = e.target.dataset.act;
+  if (act === 'color') return;
+  if (act === 'eye'){ state.scenarios[i].visible = !state.scenarios[i].visible; renderScenarios(); update(); return; }
+  if (act === 'del'){ if (state.scenarios.length <= 1) return; if (!confirm('Delete scenario "' + state.scenarios[i].name + '"?')) return; state.scenarios.splice(i, 1); if (state.active >= state.scenarios.length) state.active = state.scenarios.length - 1; else if (state.active > i) state.active--; renderAll(); return; }
+  if (i !== state.active){ state.active = i; renderAll(); }
+});
+$('#scenTabs').addEventListener('input', e => { if (e.target.dataset.act === 'color'){ const i = +e.target.closest('.scen-tab').dataset.i; state.scenarios[i].color = e.target.value; e.target.closest('.scen-tab').style.setProperty('--sc', e.target.value); update(); } });
+
+function addLeg(type){
+  const legs = activeSc().legs; const last = legs.filter(l => l.type !== 'stock').slice(-1)[0];
+  const exp = last ? last.expiry : monthlyNear(state.today, 45);
+  legs.push(type === 'stock' ? newLeg('stock', 'long', 100) : newLeg(type, 'long', 1, niceStrike(state.spot), exp));
+  renderLegs(); update();
+}
+document.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => addLeg(b.dataset.add)));
+const legsBody = $('#legsBody');
+function onLegEdit(e){
+  const el = e.target, k = el.dataset.k; if (!k) return;
+  const tr = el.closest('tr'); const i = +tr.dataset.i; const l = activeSc().legs[i]; if (!l) return;
+  if (k === 'type' || k === 'side'){
+    l[k] = el.value;
+    if (k === 'type'){
+      if (l.type === 'stock'){ l.strike = 0; l.expiry = ''; if (l.qty < 10) l.qty = 100; l.premium = round2(state.spot); }
+      else { if (!l.strike) l.strike = niceStrike(state.spot); if (!l.expiry) l.expiry = monthlyNear(state.today, 45); if (l.qty >= 100) l.qty = 1; }
+    }
+    tr.replaceWith(legRow(l, i)); update(); return;
+  }
+  if (k === 'expiry'){ if (isNaN(parseDate(el.value))) return; l.expiry = el.value; update(); return; }
+  const n = parseFloat(el.value); if (!isFinite(n) || n < 0) return;
+  if (k === 'iv' && n <= 0) return;
+  l[k] = n; update();
+}
+legsBody.addEventListener('input', onLegEdit);
+legsBody.addEventListener('change', e => { if (e.target.tagName === 'SELECT') return; onLegEdit(e); });
+legsBody.addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const i = +b.closest('tr').dataset.i, legs = activeSc().legs, l = legs[i];
+  if (b.dataset.act === 'del'){ legs.splice(i, 1); renderLegs(); update(); }
+  else if (b.dataset.act === 'dup'){ legs.splice(i + 1, 0, JSON.parse(JSON.stringify(l))); renderLegs(); update(); }
+  else if (b.dataset.act === 'solve'){
+    const iv = impliedVol(l.type, l.premium, state.spot, l.strike, yearFrac(state.today, l.expiry), state.rate/100, state.div/100);
+    if (!isFinite(iv)){ toast('Can\'t solve IV: premium is outside the no-arbitrage range (check price, strike, expiry).'); return; }
+    l.iv = round2(iv*100); b.closest('tr').querySelector('[data-k="iv"]').value = l.iv; update(); toast(`IV solved: ${l.iv.toFixed(2)}% from ${px(l.premium)} premium`);
+  }
+});
+
+// share / import / reset
+async function copyText(t){
+  try { await navigator.clipboard.writeText(t); return true; } catch(e){}
+  try { const ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; } catch(e){ return false; }
+}
+function openModal(title, text, value, okLabel, onOk){
+  $('#modalTitle').textContent = title; $('#modalText').innerHTML = text; $('#modalArea').value = value || ''; $('#modalOk').textContent = okLabel;
+  $('#modalOk').style.display = onOk ? '' : 'none'; $('#modalCancel').textContent = onOk ? 'Cancel' : 'Close';
+  $('#modal').classList.add('show'); $('#modal')._ok = onOk; setTimeout(() => { $('#modalArea').focus(); if (value) $('#modalArea').select(); }, 30);
+}
+$('#modalCancel').addEventListener('click', () => $('#modal').classList.remove('show'));
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') $('#modal').classList.remove('show'); });
+$('#modalOk').addEventListener('click', () => { const f = $('#modal')._ok; if (f && f($('#modalArea').value) !== false) $('#modal').classList.remove('show'); });
+$('#btnShare').addEventListener('click', async () => {
+  const link = shareLink(); const ok = await copyText(link);
+  if (location.protocol === 'file:'){
+    openModal('Share link', (ok ? 'Copied to your clipboard. ' : '') + 'This page is open from a local file, so the link only works on a computer that has this same file at the same path. To share with a friend, send them <b>index.html</b> plus this link; they open the file, click <b>Import</b>, and paste it. (If the page is hosted online, the link works directly.)', link, 'Load', null);
+  } else toast(ok ? 'Share link copied: it reproduces this exact setup' : 'Copy failed; the link is in the address bar');
+});
+$('#btnImport').addEventListener('click', () => openModal('Import setup', 'Paste a share link (or just the code after <code>#s=</code>).', '', 'Load', v => {
+  try { state = sanitize(decodeState(v)); renderAll(); toast('Setup loaded'); } catch(e){ toast('That link or code could not be read'); return false; }
+}));
+$('#btnReset').addEventListener('click', () => { if (confirm('Reset to the AMZN example? Your current setup will be replaced.')){ state = amznState(); renderAll(); toast('Reset to AMZN example'); } });
+
+const ovEl = $('#overlay');
+ovEl.addEventListener('pointermove', onHover); ovEl.addEventListener('pointerdown', onHover); ovEl.addEventListener('pointerleave', hideHover);
+let rT = null; new ResizeObserver(() => { clearTimeout(rT); rT = setTimeout(drawChart, 50); }).observe($('#chartWrap'));
+
+// expose for tests
+window.OptViz = { get state(){ return state; }, bs, impliedVol, expiryAnalysis, positionPL, netCost, greeksToday, numericBreakevens, applyPreset, finalExpiry, mkt };
+
+state = loadInitial();
+renderAll();
+</script>
+</body>
+</html>
