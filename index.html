@@ -661,7 +661,7 @@ function drawChart(){
       if (clipH < 1 || Math.abs(yB - yA) < 1) return;
       ctx.save(); ctx.beginPath(); ctx.rect(L, clipY, pw, clipH); ctx.clip(); path();
       const gdt = ctx.createLinearGradient(0, yA, 0, yB);
-      gdt.addColorStop(0, `rgba(${rgb},0.34)`); gdt.addColorStop(1, `rgba(${rgb},0.12)`);
+      gdt.addColorStop(0, `rgba(${rgb},0.36)`); gdt.addColorStop(1, `rgba(${rgb},0.26)`);
       ctx.fillStyle = gdt; ctx.fill(); ctx.restore();
     };
     zone(T, y0 - T, Math.min(yHi, y0 - 1), y0, ZONE_PROFIT);
