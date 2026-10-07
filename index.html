@@ -607,6 +607,7 @@ function update(){
 
 /* ================= Chart ================= */
 const chart = {series: [], geo: null};
+const ZONE_PROFIT = '34,197,94', ZONE_LOSS = '239,68,68';
 function buildSeries(){
   const m = mkt(); const out = [];
   const order = state.scenarios.map((sc, i) => i).filter(i => state.scenarios[i].visible || i === state.active);
@@ -649,16 +650,25 @@ function drawChart(){
   const xs = niceStep(xMax - xMin, Math.max(3, Math.floor(pw / 80)));
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   for (let v = Math.ceil(xMin / xs) * xs; v <= xMax; v += xs){ const x = Math.round(X(v)) + 0.5; ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, T + ph); ctx.stroke(); ctx.fillText('$' + (xs < 1 ? v.toFixed(1) : nf0.format(v)), x, T + ph + 8); }
-  // zero line
-  if (yMin < 0 && yMax > 0){ ctx.strokeStyle = 'rgba(200,210,235,0.45)'; ctx.lineWidth = 1; const y = Math.round(Y(0)) + 0.5; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(L + pw, y); ctx.stroke(); }
-  // fill under active primary curve
+  // fill under active primary curve, stronger toward the payoff and fading to the zero line
   const prim = series.filter(s => s.active).find(s => s.kind === 'expiry') || series.find(s => s.active);
   if (prim){
     const y0 = Math.max(T, Math.min(T + ph, Y(0)));
+    let yHi = y0, yLo = y0;
+    for (const [, y] of prim.pts){ const py = Y(y); if (py < yHi) yHi = py; if (py > yLo) yLo = py; }
     const path = () => { ctx.beginPath(); ctx.moveTo(X(prim.pts[0][0]), y0); for (const [x, y] of prim.pts) ctx.lineTo(X(x), Y(y)); ctx.lineTo(X(prim.pts[prim.pts.length-1][0]), y0); ctx.closePath(); };
-    ctx.save(); ctx.beginPath(); ctx.rect(L, T, pw, y0 - T); ctx.clip(); path(); ctx.fillStyle = 'rgba(52,211,153,0.10)'; ctx.fill(); ctx.restore();
-    ctx.save(); ctx.beginPath(); ctx.rect(L, y0, pw, T + ph - y0); ctx.clip(); path(); ctx.fillStyle = 'rgba(248,113,113,0.10)'; ctx.fill(); ctx.restore();
+    const zone = (clipY, clipH, yA, yB, rgb) => {
+      if (clipH < 1 || Math.abs(yB - yA) < 1) return;
+      ctx.save(); ctx.beginPath(); ctx.rect(L, clipY, pw, clipH); ctx.clip(); path();
+      const gdt = ctx.createLinearGradient(0, yA, 0, yB);
+      gdt.addColorStop(0, `rgba(${rgb},0.34)`); gdt.addColorStop(1, `rgba(${rgb},0.12)`);
+      ctx.fillStyle = gdt; ctx.fill(); ctx.restore();
+    };
+    zone(T, y0 - T, Math.min(yHi, y0 - 1), y0, ZONE_PROFIT);
+    zone(y0, T + ph - y0, Math.max(yLo, y0 + 1), y0, ZONE_LOSS);
   }
+  // zero line, drawn over the zones so $0 stays visible
+  if (yMin < 0 && yMax > 0){ ctx.strokeStyle = 'rgba(232,238,248,0.92)'; ctx.lineWidth = 1.25; ctx.setLineDash([]); const y = Math.round(Y(0)) + 0.5; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(L + pw, y); ctx.stroke(); }
   // vertical markers
   const vline = (x, color, dash, label, row) => {
     if (x < xMin || x > xMax) return;
@@ -689,7 +699,7 @@ function dashSvg(color, dash, w){ return `<svg width="22" height="6"><line x1="0
 function renderLegend(series){
   const seen = new Map(); for (const s of series) if (!seen.has(s.i)) seen.set(s.i, s.sc);
   let h = ''; for (const [i, sc] of seen) h += `<span class="it" style="${i === state.active ? 'color:var(--text);font-weight:600' : ''}"><span class="sw" style="background:${sc.color}"></span>${esc(sc.name)}${i === state.active ? ' (editing)' : ''}</span>`;
-  h += `<span class="it"><span class="sw" style="background:rgba(52,211,153,.35)"></span>profit / <span class="sw" style="background:rgba(248,113,113,.35)"></span>loss zone (editing, final expiry)</span>`;
+  h += `<span class="it"><span class="sw" style="background:rgba(${ZONE_PROFIT},0.85)"></span>profit / <span class="sw" style="background:rgba(${ZONE_LOSS},0.85)"></span>loss zone (editing, final expiry)</span>`;
   $('#legend').innerHTML = h;
 }
 function hideHover(){ const ov = $('#overlay'); ov.getContext('2d').clearRect(0, 0, ov.width, ov.height); $('#tooltip').style.display = 'none'; }
